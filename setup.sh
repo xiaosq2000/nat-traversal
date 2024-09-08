@@ -77,7 +77,7 @@ Step 2: on the redirector ($redirector_user@$redirector_hostname)
 
 Step 1: on the local machine (anyuser@anyhost)
 
-    ${GREEN}${BOLD}\$${RESET} ssh -L $remote_ssh_port:localhost:$redirector_ssh_port $redirector_user@$redirector_hostname -p $redirector_ssh_port
+    ${GREEN}${BOLD}\$${RESET} ssh -L $remote_ssh_port:localhost:$redirector_tunnel_ssh_port $redirector_user@$redirector_hostname -p $redirector_ssh_port
 
 Step 2: start a VNC client on the local machine
 
