@@ -28,20 +28,14 @@ completed() {
 has() {
 	command -v "$1" 1>/dev/null 2>&1
 }
-check_port_availability() {
-	if [[ -z $(lsof -i:$1) ]]; then
-		return 0
-	else
-		return 1
-	fi
-}
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 
-ENSURE_DEPENDENCIES=false
+INSTALL_DEPENDENCIES=false
+INSTALL_SYSTEMD=false
+UNINSTALL_SYSTEMD=false
 AUTOSSH=true
-SYSTEMD=false
 ENV_FILE=${SCRIPT_DIR}/.env
-usage() {
+display_help_messages() {
 	printf "%s\n" \
 		"Usage: " \
 		"${INDENT}$0 [option]" \
@@ -52,27 +46,70 @@ usage() {
 		"Options: " \
 		"${INDENT}-h, --help                  Display help messages" \
 		"${INDENT}-ef, --env-file ENV_FILE    Default: ${ENV_FILE}" \
-		"${INDENT}[--ensure-dependencies]     " \
-		"${INDENT}[--systemd]                 " \
+		"${INDENT}[--install-dependencies]    " \
+		"${INDENT}[--install-systemd]         " \
+		"${INDENT}[--uninstall-systemd]       " \
 		"${INDENT}[--no-autossh]              " \
 		""
+}
+usage() {
+	if [ ! -f "$ENV_FILE" ]; then
+		error "$ENV_FILE not found."
+		exit 1
+	fi
+
+	set -o allexport && source ${ENV_FILE} && set +o allexport
+
+	if [ $VNC != true ]; then
+		printf "%s\n" "Usage: SSH twice
+
+Step 1: on the local machine (anyuser@anyhost)
+
+    ${GREEN}${BOLD}\$${RESET} ssh $redirector_user@$redirector_hostname -p $redirector_ssh_port [-X]
+
+Step 2: on the redirector ($redirector_user@$redirector_hostname) 
+
+    ${GREEN}${BOLD}\$${RESET} ssh $USER@localhost -p $redirector_tunnel_ssh_port [-Y]
+"
+	else
+		printf "%s\n" "Usage: 
+
+Step 1: on the local machine (anyuser@anyhost)
+
+    ${GREEN}${BOLD}\$${RESET} ssh -L $remote_ssh_port:localhost:$redirector_ssh_port $redirector_user@$redirector_hostname -p $redirector_ssh_port
+
+Step 2: start a VNC client on the local machine
+
+    localhost::$remote_ssh_port
+"
+	fi
 }
 while [[ $# -gt 0 ]]; do
 	case "$1" in
 	-h | --help)
+		display_help_messages
+		shift 1
+		exit 0
+		;;
+	--usage)
 		usage
+		shift 1
 		exit 0
 		;;
 	-ef | --env-file)
 		ENV_FILE="$2"
 		shift 2
 		;;
-	--ensure-dependencies)
-		ENSURE_DEPENDENCIES=true
+	--install-dependencies)
+		INSTALL_DEPENDENCIES=true
 		shift 1
 		;;
-	--systemd)
-		SYSTEMD=true
+	--install-systemd)
+		INSTALL_SYSTEMD=true
+		shift 1
+		;;
+	--uninstall-systemd)
+		UNINSTALL_SYSTEMD=true
 		shift 1
 		;;
 	--no-autossh)
@@ -81,12 +118,13 @@ while [[ $# -gt 0 ]]; do
 		;;
 	*)
 		error "Unknown argument: $1"
-		usage
+		display_help_messages
+		exit 1
 		;;
 	esac
 done
 
-if $ENSURE_DEPENDENCIES = true || $SYSTEMD = true; then
+if $INSTALL_DEPENDENCIES = true || $INSTALL_SYSTEMD = true; then
 	if [[ $(id -u) -ne 0 ]]; then
 		error "Try again with sudo."
 		exit 1
@@ -98,7 +136,42 @@ else
 	fi
 fi
 
-if $ENSURE_DEPENDENCIES = true; then
+check_port_availability() {
+	if [[ $(id -u) -eq 0 ]]; then
+		if [[ -z $(sudo lsof -i:$1) ]]; then
+			return 0
+		else
+			return 1
+		fi
+	else
+		if [[ -z $(lsof -i:$1) ]]; then
+			return 0
+		else
+			return 1
+		fi
+	fi
+}
+
+SYSTEMD_SERVICE_DIR="/etc/systemd/system"
+install_systemd() {
+	if [[ $(id -u) -eq 0 ]]; then
+		sudo cp "$SCRIPT_DIR/nat-traversal@.service" "$SYSTEMD_SERVICE_DIR/nat-traversal@.service"
+		sudo systemctl daemon-reload
+	fi
+}
+uninstall_systemd() {
+	if [[ $(id -u) -eq 0 ]]; then
+		set +e
+		if [[ ! -z "$(ls $SYSTEMD_SERVICE_DIR | grep 'nat-traversal@.service')" ]]; then
+			debug "Found nat-traversal@.service in $SYSTEMD_SERVICE_DIR. Try to stop and disable all instances and remove the service template file."
+			systemctl list-units -t service --full --all | grep 'nat-traversal' | awk '{print $1}' | xargs -i systemctl disable \{\} --now
+			sudo rm "${SYSTEMD_SERVICE_DIR}/nat-traversal@.service"
+		fi
+		set -e
+	fi
+}
+
+if $INSTALL_DEPENDENCIES = true; then
 	if [[ ! $(lsb_release -d | grep 'Ubuntu') ]]; then
 		warning "The script has only been tested on Ubuntu."
 	fi
@@ -110,57 +183,46 @@ if $ENSURE_DEPENDENCIES = true; then
 	sudo systemctl enable ssh --now
 fi
 
-set +e
-if $SYSTEMD = true; then
+if $INSTALL_SYSTEMD = true; then
+
 	# Replace the User line
 	sed -i "/^\[Service\]/,/\[/s/^User=.*/User=$SUDO_USER/" $SCRIPT_DIR/nat-traversal@.service
 	# Replace the ExecStart line
 	sed -i "/^\[Service\]/,/\[/s|ExecStart=.*|ExecStart=$SCRIPT_DIR/setup.sh --env-file $SCRIPT_DIR/.env.%i|" $SCRIPT_DIR/nat-traversal@.service
 
-	SYSTEMD_SERVICE_DIR="/etc/systemd/system"
-
-	systemd_clear() {
-		if [[ ! -z "$(ls $SYSTEMD_SERVICE_DIR | grep 'nat-traversal@.service')" ]]; then
-			debug "Found nat-traversal@.service in $SYSTEMD_SERVICE_DIR. Try to stop and disable all instances and remove the service template file."
-			systemctl list-units -t service --full --all | grep 'nat-traversal' | awk '{print $1}' | xargs -i systemctl disable \{\} --now
-			sudo rm "${SYSTEMD_SERVICE_DIR}/nat-traversal@.service"
-		fi
-	}
-	systemd_clear
-
-	sudo cp "$SCRIPT_DIR/nat-traversal@.service" "$SYSTEMD_SERVICE_DIR/nat-traversal@.service"
-	sudo systemctl daemon-reload
-else
-	if [ ! -f "$ENV_FILE" ]; then
-		error "$ENV_FILE not found."
-		exit 1
-	fi
-	set -o allexport && source ${ENV_FILE} && set +o allexport
-
-	printf "%s\n" "Usage: ssh twice
-
-${GREEN}anyuser@anyhost:~${BOLD}\$${RESET} ssh $remote_user@$remote_hostname -p $remote_ssh_port
-${GREEN}$remote_user@$remote_hostname:~${BOLD}\$${RESET} ssh $USER@localhost -p $remote_tunnel_ssh_port
-"
-
-	warning "Make sure the port ${BOLD}${YELLOW}$remote_tunnel_ssh_port${RESET} is available on ${BOLD}${YELLOW}$remote_hostname${RESET}"
-	if ! check_port_availability $local_autossh_monitor_port; then
-		error "local_autossh_monitor_port=$local_autossh_monitor_port is unavailable."
-		exit 1
-	fi
-
-	ssh-keygen -R $remote_hostname >/dev/null 2>&1
-	if $AUTOSSH = true; then
-		autossh -M $local_autossh_monitor_port -N -R "$remote_tunnel_ssh_port:localhost:$local_ssh_port" "$remote_user@$remote_hostname" -X -p $remote_ssh_port
-	else
-		ssh -N -R "$remote_tunnel_ssh_port:localhost:$local_ssh_port" "$remote_user@$remote_hostname" -X -p $remote_ssh_port
-	fi
+	debug "Try to uninstall related systemd services first before installation."
+	uninstall_systemd
+	install_systemd
+	exit 0
 fi
-set -e
 
-if [ $? -ne 0 ]; then
-	error "Something goes wrong."
+if $UNINSTALL_SYSTEMD = true; then
+	uninstall_systemd
+	exit 0
+fi
+
+if [ ! -f "$ENV_FILE" ]; then
+	error "$ENV_FILE not found."
 	exit 1
-else
-	completed "Done."
 fi
+
+set -o allexport && source ${ENV_FILE} && set +o allexport
+
+usage
+
+warning "Make sure the port ${BOLD}${YELLOW}$redirector_tunnel_ssh_port${RESET} is available on ${BOLD}${YELLOW}$redirector_hostname${RESET}"
+if ! check_port_availability $remote_autossh_monitor_port; then
+	error "remote_autossh_monitor_port=$remote_autossh_monitor_port is unavailable."
+	exit 1
+fi
+
+ssh-keygen -R $redirector_hostname >/dev/null 2>&1
+
+debug "Try to construct SSH reverse tunnel."
+if $AUTOSSH = true; then
+	autossh -M $remote_autossh_monitor_port -XNR "$redirector_tunnel_ssh_port:localhost:$remote_ssh_port" "$redirector_user@$redirector_hostname" -p $redirector_ssh_port
+else
+	ssh -XNR "$redirector_tunnel_ssh_port:localhost:$remote_ssh_port" "$redirector_user@$redirector_hostname" -p $redirector_ssh_port
+fi
+
+completed "Done."
