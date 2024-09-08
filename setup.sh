@@ -216,7 +216,9 @@ if ! check_port_availability $remote_autossh_monitor_port; then
 	exit 1
 fi
 
+set +e
 ssh-keygen -R $redirector_hostname >/dev/null 2>&1
+set -e
 
 debug "Try to construct SSH reverse tunnel."
 if $AUTOSSH = true; then
