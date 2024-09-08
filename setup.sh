@@ -44,8 +44,9 @@ display_help_messages() {
 		""
 	printf "%s\n" \
 		"Options: " \
-		"${INDENT}-h, --help                  Display help messages" \
+		"${INDENT}-h, --help                  Display help messages of this script" \
 		"${INDENT}-ef, --env-file ENV_FILE    Default: ${ENV_FILE}" \
+		"${INDENT}--usage                     Display help messages based on given ENV_FILE" \
 		"${INDENT}[--install-dependencies]    " \
 		"${INDENT}[--install-systemd]         " \
 		"${INDENT}[--uninstall-systemd]       " \
