@@ -4,6 +4,8 @@ Access your PC from anywhere, anytime using a redirector for SSH reverse tunneli
 
 **Note: For security reasons, the redirector should only be accessible within an intranet or VPN!**
 
+![Safe NAT Traversal Diagram](./doc/illustration.svg)
+
 ## Quick start
 
 ### 0. Get the redirector ready
