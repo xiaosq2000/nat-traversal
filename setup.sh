@@ -41,9 +41,9 @@ display_help_messages() {
 		"${INDENT}$0 [option]" \
 		"" \
 		"${INDENT}NAT Traversal Setup:" \
-        "" \
-        "${INDENT}Access your PC from anywhere and anytime safely." \
-        "" \
+		"" \
+		"${INDENT}Access your PC from anywhere and anytime safely." \
+		"" \
 		"${INDENT}${BOLD}This script should be executed on the remote machine.${RESET}" \
 		"
 ${INDENT}+-------------------------------------------------------------+
@@ -52,14 +52,6 @@ ${INDENT}|  For security, the redirector should only be accessible in  |
 ${INDENT}|      1. Intranet of your organization                       |
 ${INDENT}|      2. VPN service endorsed by your organization           |
 ${INDENT}+-------------------------------------------------------------+
-" \
-		"
-${INDENT}+-----------------+       +--------------+               +------------------+ 
-${INDENT}|                 |  VPN  |              |               |                  | 
-${INDENT}|  Local Machine  |<----->|  Redirector  |<------------->|  Remote Machine  | 
-${INDENT}|                 |<----->|              |<------------->|                  | 
-${INDENT}|    (Internet)   |  SSH  |  (Intranet)  |  Reverse SSH  |    (Intranet)    | 
-${INDENT}+-----------------+       +--------------+               +------------------+ 
 " \
 		""
 	printf "%s\n" \
@@ -71,7 +63,19 @@ ${INDENT}+-----------------+       +--------------+               +-------------
 		"${INDENT}[--install-systemd]         " \
 		"${INDENT}[--uninstall-systemd]       " \
 		"${INDENT}[--no-autossh]              " \
-		""
+		"" \
+		"
+${INDENT}+-----------------+       +--------------+               +------------------+ 
+${INDENT}|                 |  VPN  |              |               |                  | 
+${INDENT}|  Local Machine  |<----->|  Redirector  |<------------->|  Remote Machine  | 
+${INDENT}|                 |<----->|              |<------------->|                  | 
+${INDENT}|    (Internet)   |  SSH  |  (Intranet)  |  Reverse SSH  |    (Intranet)    | 
+${INDENT}+-----------------+       +--------------+               +------------------+ 
+" \
+		"Template of ENV_FILE:
+
+$(cat .env)
+"
 }
 display_usage_messages() {
 	if [ ! -f "$ENV_FILE" ]; then
