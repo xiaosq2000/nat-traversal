@@ -40,23 +40,26 @@ display_help_messages() {
 		"Usage: " \
 		"${INDENT}$0 [option]" \
 		"" \
-		"${INDENT}NAT Traversal Setup: Access your PC from anywhere and anytime safely." \
-		"" \
-		"${BOLD}
-+------------------------------------------------------------------------------+
-|  Take Care!                                                                  |
-|  For security, the redirector should only be accessible in                   |
-|      1. Intranet of your organization                                        |
-|      2. VPN service endorsed by your organization                            |
-+------------------------------------------------------------------------------+
-${RESET}" \
+		"${INDENT}NAT Traversal Setup:" \
+        "" \
+        "${INDENT}Access your PC from anywhere and anytime safely." \
+        "" \
+		"${INDENT}${BOLD}This script should be executed on the remote machine.${RESET}" \
 		"
- +-----------------+       +--------------+               +------------------+ 
- |                 |  VPN  |              |               |                  | 
- |  Local Machine  |<----->|  Redirector  |<------------->|  Remote Machine  | 
- |                 |<----->|              |<------------->|                  | 
- |    (Internet)   |  SSH  |  (Intranet)  |  Reverse SSH  |    (Intranet)    | 
- +-----------------+       +--------------+               +------------------+ 
+${INDENT}+-------------------------------------------------------------+
+${INDENT}|  Take Care!                                                 |
+${INDENT}|  For security, the redirector should only be accessible in  |
+${INDENT}|      1. Intranet of your organization                       |
+${INDENT}|      2. VPN service endorsed by your organization           |
+${INDENT}+-------------------------------------------------------------+
+" \
+		"
+${INDENT}+-----------------+       +--------------+               +------------------+ 
+${INDENT}|                 |  VPN  |              |               |                  | 
+${INDENT}|  Local Machine  |<----->|  Redirector  |<------------->|  Remote Machine  | 
+${INDENT}|                 |<----->|              |<------------->|                  | 
+${INDENT}|    (Internet)   |  SSH  |  (Intranet)  |  Reverse SSH  |    (Intranet)    | 
+${INDENT}+-----------------+       +--------------+               +------------------+ 
 " \
 		""
 	printf "%s\n" \
