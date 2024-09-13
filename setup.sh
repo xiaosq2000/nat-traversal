@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 INDENT='    '
 BOLD="$(tput bold 2>/dev/null || printf '')"
@@ -40,7 +40,24 @@ display_help_messages() {
 		"Usage: " \
 		"${INDENT}$0 [option]" \
 		"" \
-		"${INDENT}For NAT Traversal" \
+		"${INDENT}NAT Traversal Setup: Access your PC from anywhere and anytime safely." \
+		"" \
+		"${BOLD}
++------------------------------------------------------------------------------+
+|  Take Care!                                                                  |
+|  For security, the redirector should only be accessible in                   |
+|      1. Intranet of your organization                                        |
+|      2. VPN service endorsed by your organization                            |
++------------------------------------------------------------------------------+
+${RESET}" \
+		"
+ +-----------------+       +--------------+               +------------------+ 
+ |                 |  VPN  |              |               |                  | 
+ |  Local Machine  |<----->|  Redirector  |<------------->|  Remote Machine  | 
+ |                 |<----->|              |<------------->|                  | 
+ |    (Internet)   |  SSH  |  (Intranet)  |  Reverse SSH  |    (Intranet)    | 
+ +-----------------+       +--------------+               +------------------+ 
+" \
 		""
 	printf "%s\n" \
 		"Options: " \
@@ -53,9 +70,9 @@ display_help_messages() {
 		"${INDENT}[--no-autossh]              " \
 		""
 }
-usage() {
+display_usage_messages() {
 	if [ ! -f "$ENV_FILE" ]; then
-		error "$ENV_FILE not found."
+		error "$ENV_FILE not found. Make sure the argument --env-file is set BEFORE --usage"
 		exit 1
 	fi
 
@@ -93,7 +110,7 @@ while [[ $# -gt 0 ]]; do
 		exit 0
 		;;
 	--usage)
-		usage
+		display_usage_messages
 		shift 1
 		exit 0
 		;;
@@ -125,7 +142,7 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
-if $INSTALL_DEPENDENCIES = true || $INSTALL_SYSTEMD = true; then
+if [ $INSTALL_DEPENDENCIES = true ] || [ $INSTALL_SYSTEMD = true ] || [ $UNINSTALL_SYSTEMD = true ]; then
 	if [[ $(id -u) -ne 0 ]]; then
 		error "Try again with sudo."
 		exit 1
@@ -161,14 +178,34 @@ install_systemd() {
 	fi
 }
 uninstall_systemd() {
-	if [[ $(id -u) -eq 0 ]]; then
-		set +e
-		if [[ ! -z "$(ls $SYSTEMD_SERVICE_DIR | grep 'nat-traversal@.service')" ]]; then
-			debug "Found nat-traversal@.service in $SYSTEMD_SERVICE_DIR. Try to stop and disable all instances and remove the service template file."
-			systemctl list-units -t service --full --all | grep 'nat-traversal' | awk '{print $1}' | xargs -i systemctl disable \{\} --now
-			sudo rm "${SYSTEMD_SERVICE_DIR}/nat-traversal@.service"
-		fi
-		set -e
+	if [[ $(id -u) -ne 0 ]]; then
+		error "Try again with 'sudo -E'."
+		exit 1
+	fi
+	set +u
+	# TODO: it works only if `sudo -E`
+	if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ]; then
+		set -u
+		warning "Uninstall the systemd service may kill current SSH session."
+		read -p "Do you want to proceed? (y/N) " yn
+		case $yn in
+		yes | y)
+			set +e
+			if [[ ! -z "$(ls $SYSTEMD_SERVICE_DIR | grep 'nat-traversal@.service')" ]]; then
+				debug "Found nat-traversal@.service in $SYSTEMD_SERVICE_DIR. Try to stop and disable all instances and remove the service template file."
+				systemctl list-units -t service --full --all | grep 'nat-traversal' | awk '{print $1}' | xargs -i systemctl disable \{\} --now
+				sudo rm "${SYSTEMD_SERVICE_DIR}/nat-traversal@.service"
+			fi
+			set -e
+			return 0
+			;;
+		no | n)
+			return 0
+			;;
+		*)
+			return 0
+			;;
+		esac
 	fi
 }
 
@@ -209,7 +246,7 @@ fi
 
 set -o allexport && source ${ENV_FILE} && set +o allexport
 
-usage
+display_usage_messages
 
 warning "Make sure the port ${BOLD}${YELLOW}$redirector_tunnel_ssh_port${RESET} is available on ${BOLD}${YELLOW}$redirector_hostname${RESET}"
 if ! check_port_availability $remote_autossh_monitor_port; then
@@ -217,6 +254,7 @@ if ! check_port_availability $remote_autossh_monitor_port; then
 	exit 1
 fi
 
+debug 'Execute "ssh-keygen -R $redirector_hostname"'
 set +e
 ssh-keygen -R $redirector_hostname >/dev/null 2>&1
 set -e
