@@ -20,7 +20,9 @@ info() {
 	printf '%s\n' "${BOLD}${GREEN}INFO:${RESET} $*"
 }
 debug() {
-	printf '%s\n' "${BOLD}${GREY}DEBUG:${RESET} $*"
+    set +u;
+	[ "$VERBOSE" = "true" ] && printf '%s\n' "${BOLD}${GREY}DEBUG:${RESET} $*"
+    set -u;
 }
 completed() {
 	printf '%s\n' "${BOLD}${GREEN}✓${RESET} $*"
@@ -57,12 +59,16 @@ ${INDENT}+-------------------------------------------------------------+
 	printf "%s\n" \
 		"Options: " \
 		"${INDENT}-h, --help                  Display help messages of this script" \
+		"" \
 		"${INDENT}-ef, --env-file ENV_FILE    Default: ${ENV_FILE}" \
-		"${INDENT}--usage                     Display help messages based on given ENV_FILE" \
-		"${INDENT}[--install-dependencies]    " \
+		"${INDENT}[--usage]                   Display help messages based on given ENV_FILE" \
+		"" \
+		"${INDENT}[--verbose]                 Display help messages based on given ENV_FILE" \
+		"" \
 		"${INDENT}[--install-systemd]         " \
 		"${INDENT}[--uninstall-systemd]       " \
-		"${INDENT}[--no-autossh]              " \
+		"${INDENT}[--install-dependencies]    " \
+		"${INDENT}[--no-autossh]              Use ssh instead of autossh" \
 		"" \
 		"
 ${INDENT}+-----------------+       +--------------+               +------------------+ 
@@ -124,6 +130,10 @@ while [[ $# -gt 0 ]]; do
 	-ef | --env-file)
 		ENV_FILE="$2"
 		shift 2
+		;;
+	--verbose)
+		VERBOSE=true
+		shift 1
 		;;
 	--install-dependencies)
 		INSTALL_DEPENDENCIES=true
