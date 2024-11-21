@@ -9,7 +9,7 @@ Type=simple
 User=shuqixiao
 ExecStart=/home/shuqixiao/Projects/nat-traversal/setup.sh --env-file /home/shuqixiao/Projects/nat-traversal/.env.%i
 Restart=on-failure
-RestartSec=30min
+RestartSec=3min
 
 [Install]
 WantedBy=multi-user.target
