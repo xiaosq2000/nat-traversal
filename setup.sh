@@ -20,9 +20,9 @@ info() {
 	printf '%s\n' "${BOLD}${GREEN}INFO:${RESET} $*"
 }
 debug() {
-    set +u;
+	set +u
 	[ "$VERBOSE" = "true" ] && printf '%s\n' "${BOLD}${GREY}DEBUG:${RESET} $*"
-    set -u;
+	set -u
 }
 completed() {
 	printf '%s\n' "${BOLD}${GREEN}✓${RESET} $*"
@@ -236,6 +236,7 @@ if $INSTALL_DEPENDENCIES = true; then
 	fi
 	sudo apt install -y -qq openssh-server
 	sudo systemctl enable ssh --now
+	exit 0
 fi
 
 if $INSTALL_SYSTEMD = true; then
