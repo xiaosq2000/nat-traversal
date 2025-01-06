@@ -14,7 +14,7 @@ Type=simple
 Environment=SCRIPT_DIR=/home/shuqixiao/Projects/nat-traversal
 
 # Main command to start the NAT traversal service
-ExecStart=$SCRIPT_DIR/setup.sh --env-file $SCRIPT_DIR/.env.%i
+ExecStart=/bin/bash -c '${SCRIPT_DIR}/setup.sh --env-file ${SCRIPT_DIR}/.env.%i'
 
 # Restart every 3 minutes
 Restart=on-failure
