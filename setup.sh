@@ -14,12 +14,12 @@ VNC=false
 display_topology_messages() {
 	printf "%s\n" \
 		"
-${INDENT}+-----------------+       +--------------+               +------------------+ 
-${INDENT}|                 |       |              |               |                  | 
-${INDENT}|  Local Machine  |<----->|  Redirector  |<------------->|  Remote Machine  | 
-${INDENT}|                 |<----->|              |<------------->|                  | 
-${INDENT}|    (Internet)   |  SSH  |  (Internet)  |  Reverse SSH  |    (Intranet)    | 
-${INDENT}+-----------------+       +--------------+               +------------------+ 
+${INDENT}+-----------------+    +--------------+               +------------------+ 
+${INDENT}|                 |    |              |               |                  | 
+${INDENT}|  Local Machine  |<-->|  Redirector  |<------------->|  Remote Machine  | 
+${INDENT}|                 |<-->|              |<------------->|                  | 
+${INDENT}|    (Internet)   |    |  (Internet)  |  Reverse SSH  |    (Intranet)    | 
+${INDENT}+-----------------+    +--------------+               +------------------+ 
 " \
     "${INDENT}${BOLD}Note${RESET}: this script should be executed on the remote machine." \
     "
@@ -29,7 +29,7 @@ ${INDENT}|  For security, the redirector should only be accessible:    |
 ${INDENT}|      1. in the intranet of your organization, or            |
 ${INDENT}|      2. with VPN service endorsed by your organization      |
 ${INDENT}+-------------------------------------------------------------+
-" \
+"
 }
 
 display_help_messages() {
@@ -64,7 +64,6 @@ display_help_messages() {
 		"${INDENT}[--no-autossh]              Use ssh instead of autossh for debugging" \
 		"" \
 		"Template of ENV_FILE:
-
 $(cat .env)
 "
 }
