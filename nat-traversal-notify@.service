@@ -3,4 +3,5 @@ Description=NAT Traversal Notification Service
 
 [Service]
 Type=oneshot
-ExecStart=/bin/bash -c 'source /home/shuqixiao/Projects/nat-traversal/utils.sh && email_notify_on_failure "NAT traversal service (.env.%i) failed: Start limit reached. $(cat /home/shuqixiao/Projects/nat-traversal/.env.%i)"'
+Environment=SCRIPT_DIR=/home/shuqixiao/Projects/nat-traversal
+ExecStart=/bin/bash -c 'source $SCRIPT_DIR/utils.sh && email_notify_on_failure "NAT traversal service (.env.%i) failed: Start limit reached. $(cat $SCRIPT_DIR/.env.%i)"'

@@ -1,94 +1,74 @@
 #!/usr/bin/env bash
 set -euo pipefail
-INDENT='    '
-BOLD="$(tput bold 2>/dev/null || printf '')"
-GREY="$(tput setaf 0 2>/dev/null || printf '')"
-UNDERLINE="$(tput smul 2>/dev/null || printf '')"
-RED="$(tput setaf 1 2>/dev/null || printf '')"
-GREEN="$(tput setaf 2 2>/dev/null || printf '')"
-YELLOW="$(tput setaf 3 2>/dev/null || printf '')"
-BLUE="$(tput setaf 4 2>/dev/null || printf '')"
-MAGENTA="$(tput setaf 5 2>/dev/null || printf '')"
-RESET="$(tput sgr0 2>/dev/null || printf '')"
-error() {
-	printf '%s\n' "${BOLD}${RED}ERROR:${RESET} $*" >&2
-}
-warning() {
-	printf '%s\n' "${BOLD}${YELLOW}WARNING:${RESET} $*"
-}
-info() {
-	printf '%s\n' "${BOLD}${GREEN}INFO:${RESET} $*"
-}
-debug() {
-	set +u
-	[ "$VERBOSE" = "true" ] && printf '%s\n' "${BOLD}${GREY}DEBUG:${RESET} $*"
-	set -u
-}
-completed() {
-	printf '%s\n' "${BOLD}${GREEN}✓${RESET} $*"
-}
-has() {
-	command -v "$1" 1>/dev/null 2>&1
-}
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+source ${SCRIPT_DIR}/utils.sh
+
+SYSTEMD_SERVICE_DIR="${HOME}/.config/systemd/user"
 
 INSTALL_SYSTEMD=false
-SYSTEMD_SERVICE_DIR="${HOME}/.config/systemd/user"
 AUTOSSH=true
 X11=false
+X11_TRUSTED=false
 VNC=false
-ENV_FILE=${SCRIPT_DIR}/.env
+
+display_topology_messages() {
+	printf "%s\n" \
+		"
+${INDENT}+-----------------+       +--------------+               +------------------+ 
+${INDENT}|                 |       |              |               |                  | 
+${INDENT}|  Local Machine  |<----->|  Redirector  |<------------->|  Remote Machine  | 
+${INDENT}|                 |<----->|              |<------------->|                  | 
+${INDENT}|    (Internet)   |  SSH  |  (Internet)  |  Reverse SSH  |    (Intranet)    | 
+${INDENT}+-----------------+       +--------------+               +------------------+ 
+" \
+    "${INDENT}${BOLD}Note${RESET}: this script should be executed on the remote machine." \
+    "
+${INDENT}+-------------------------------------------------------------+
+${INDENT}|  Take Care!                                                 |
+${INDENT}|  For security, the redirector should only be accessible:    |
+${INDENT}|      1. in the intranet of your organization, or            |
+${INDENT}|      2. with VPN service endorsed by your organization      |
+${INDENT}+-------------------------------------------------------------+
+" \
+}
+
 display_help_messages() {
+	display_topology_messages
+
 	printf "%s\n" \
 		"Usage: " \
 		"${INDENT}$0 [option]" \
-		"" \
-		"${INDENT}NAT Traversal Setup:" \
-		"" \
-		"${INDENT}Access your PC from anywhere and anytime safely." \
-		"" \
-		"${INDENT}${BOLD}This script should be executed on the remote machine.${RESET}" \
-		"
-${INDENT}+-------------------------------------------------------------+
-${INDENT}|  Take Care!                                                 |
-${INDENT}|  For security, the redirector should only be accessible in  |
-${INDENT}|      1. Intranet of your organization                       |
-${INDENT}|      2. VPN service endorsed by your organization           |
-${INDENT}+-------------------------------------------------------------+
-" \
 		""
 	printf "%s\n" \
 		"Options: " \
 		"${INDENT}-h, --help                  Display help messages of this script" \
+		"" \
+		"${INDENT}-ef, --env-file ENV_FILE    Configuration file, to be named like '.env.1', '.env.2'..." \
+		"" \
 		"${INDENT}[--list-env-files]          List the first line of .env.* files" \
 		"${INDENT}[--reindex-env-files]       Rename the .env.* files" \
 		"" \
-		"${INDENT}-ef, --env-file ENV_FILE    Default: ${ENV_FILE}" \
-		"" \
-		"${INDENT}-x, --x11                   Enable X11 forwarding" \
-		"" \
-		"${INDENT}[--install-dependencies]    " \
-		"${INDENT}[--install-systemd]         " \
-		"${INDENT}[--email-notify-on-failure] " \
-		"${INDENT}[--uninstall-systemd]       " \
+		"${INDENT}[-x, --x11]                 Enable X11 forwarding" \
+		"${INDENT}[-y, --x11-trusted]         Enable trusted X11 forwarding" \
+		"${INDENT}[--vnc]                     Specify VNC connection" \
 		"" \
 		"${INDENT}[--usage]                   Display help messages based on given ENV_FILE" \
+		"" \
+		"${INDENT}[--install-dependencies]    Install ssh server and autossh" \
+		"" \
+		"${INDENT}[--install-systemd]         " \
+		"${INDENT}[--install-systemd-email-notification] " \
+		"${INDENT}[--uninstall-systemd]       " \
+		"" \
 		"${INDENT}[--verbose]                 Display help messages based on given ENV_FILE" \
 		"${INDENT}[--no-autossh]              Use ssh instead of autossh for debugging" \
 		"" \
-		"
-${INDENT}+-----------------+       +--------------+               +------------------+ 
-${INDENT}|                 |  VPN  |              |               |                  | 
-${INDENT}|  Local Machine  |<----->|  Redirector  |<------------->|  Remote Machine  | 
-${INDENT}|                 |<----->|              |<------------->|                  | 
-${INDENT}|    (Internet)   |  SSH  |  (Intranet)  |  Reverse SSH  |    (Intranet)    | 
-${INDENT}+-----------------+       +--------------+               +------------------+ 
-" \
 		"Template of ENV_FILE:
 
 $(cat .env)
 "
 }
+
 display_usage_messages() {
 	if [ ! -f "$ENV_FILE" ]; then
 		error "$ENV_FILE not found. Make sure the argument --env-file is set BEFORE --usage"
@@ -97,16 +77,16 @@ display_usage_messages() {
 
 	set -o allexport && source ${ENV_FILE} && set +o allexport
 
-	if [ $VNC != true ]; then
+	if [[ $VNC != true ]]; then
 		printf "%s\n" "Usage: SSH twice
 
 Step 1: on the local machine (anyuser@anyhost)
 
-    ${GREEN}${BOLD}\$${RESET} ssh $redirector_user@$redirector_hostname -p $redirector_ssh_port [-X]
+    ${GREEN}${BOLD}\$${RESET} ssh $redirector_user@$redirector_hostname -p $redirector_ssh_port [-YC]
 
 Step 2: on the redirector ($redirector_user@$redirector_hostname) 
 
-    ${GREEN}${BOLD}\$${RESET} ssh $USER@localhost -p $redirector_tunnel_ssh_port [-Y]
+    ${GREEN}${BOLD}\$${RESET} ssh $USER@localhost -p $redirector_tunnel_ssh_port [-YC]
 "
 	else
 		printf "%s\n" "Usage: 
@@ -146,25 +126,21 @@ reindex_env_files() {
 
 install_dependencies() {
 	if [[ ! $(lsb_release -d | grep 'Ubuntu') ]]; then
-		warning "Argument '--install-dependencies' has only been tested on Ubuntu."
+		error "Argument '--install-dependencies' has only been tested on Ubuntu."
 	fi
 	if ! has autossh; then
 		sudo apt-get -qq update
 		sudo apt-get install -y -qq autossh
+		completed "Installed autossh by APT."
 	fi
 	sudo apt install -y -qq openssh-server
-	sudo systemctl enable ssh --now
-    exit 0
-}
-
-install_systemd() {
-	debug "Try to install related systemd services into $BOLD$GREEN${SYSTEMD_SERVICE_DIR}$RESET."
-	cp "$SCRIPT_DIR/nat-traversal@.service" "$SYSTEMD_SERVICE_DIR/nat-traversal@.service"
-	systemctl --user daemon-reload
+	sudo systemctl enable sshd --now
+	completed "Enabled sshd now."
+	exit 0
 }
 
 uninstall_systemd() {
-	debug "Try to uninstall previous systemd services from $BOLD$GREEN${SYSTEMD_SERVICE_DIR}$RESET before installation."
+	info "Uninstalling related systemd services."
 	local to_uninstall=true
 	set +u
 	if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ]; then
@@ -190,13 +166,47 @@ uninstall_systemd() {
 	if [[ $to_uninstall == "true" ]]; then
 		set +e
 		if [[ ! -z "$(ls $SYSTEMD_SERVICE_DIR | grep 'nat-traversal@.service')" ]]; then
-			debug "Found nat-traversal@.service in $SYSTEMD_SERVICE_DIR. Try to stop and disable all instances and remove the service template file."
+			info "Found ${BOLD}nat-traversal@.service${RESET} in $BOLD${SYSTEMD_SERVICE_DIR}$RESET."
+			info "Stopping and disabling all instances."
 			SYSTEMD_COLORS=0 systemctl --user list-units -t service --full --all --no-legend --plain | grep 'nat-traversal@' | awk '{print $1}' | xargs -i systemctl --user disable \{\} --now
+			info "Removing the service template file."
 			rm "${SYSTEMD_SERVICE_DIR}/nat-traversal@.service"
 		fi
 		set -e
 	fi
+
+	completed "Uninstalled related systemd services."
 }
+
+install_systemd() {
+	sed -i "s|^Environment=SCRIPT_DIR=.*|Environment=SCRIPT_DIR=${SCRIPT_DIR}|" nat-traversal@.service
+
+	uninstall_systemd
+
+	info "Installing ${BOLD}nat-traversal@.service${RESET} into ${BOLD}$SYSTEMD_SERVICE_DIR${RESET}."
+
+	cp "$SCRIPT_DIR/nat-traversal@.service" "$SYSTEMD_SERVICE_DIR/nat-traversal@.service"
+	systemctl --user daemon-reload
+
+	completed "Installed related systemd services."
+}
+
+install_systemd_email_notification() {
+	if has "msmtp"; then
+		completed "msmtp is found."
+		warning "${BOLD}msmtp${RESET} should be configured manually."
+		info "Installing ${BOLD}nat-traversal-notify@.service${RESET} into ${BOLD}$SYSTEMD_SERVICE_DIR${RESET}."
+
+		sed -i "s|^Environment=SCRIPT_DIR=.*|Environment=SCRIPT_DIR=${SCRIPT_DIR}|" nat-traversal-notify@.service
+		cp $SCRIPT_DIR/nat-traversal-notify@.service $SYSTEMD_SERVICE_DIR
+		systemctl --user daemon-reload
+
+		completed "Installed ${BOLD}nat-traversal-notify@.service${RESET} into ${BOLD}$SYSTEMD_SERVICE_DIR${RESET}."
+	else
+		error "msmtp not found."
+	fi
+}
+
 while [[ $# -gt 0 ]]; do
 	case "$1" in
 	-h | --help)
@@ -206,6 +216,39 @@ while [[ $# -gt 0 ]]; do
 		;;
 	--usage)
 		display_usage_messages
+		shift 1
+		exit 0
+		;;
+	-ef | --env-file)
+		ENV_FILE="$2"
+		shift 2
+		;;
+	--x11 | -x)
+		X11=true
+		shift 1
+		;;
+	--x11-trusted | -y)
+		X11_TRUSTED=true
+		shift 1
+		;;
+	--vnc)
+		VNC=true
+		shift 1
+		;;
+	--install-dependencies)
+		install_dependencies
+		shift 1
+		;;
+	--install-systemd)
+		install_systemd
+		shift 1
+		;;
+	--install-systemd-email-notification)
+		install_systemd_email_notification
+		shift 1
+		;;
+	--uninstall-systemd)
+		uninstall_systemd
 		shift 1
 		exit 0
 		;;
@@ -219,33 +262,8 @@ while [[ $# -gt 0 ]]; do
 		shift 1
 		exit 0
 		;;
-	--install-dependencies)
-		install_dependencies
-		shift 1
-		;;
-	--install-systemd)
-		INSTALL_SYSTEMD=true
-		shift 1
-		;;
-	--email-notify-on-failure)
-        cp $SCRIPT_DIR/nat-traversal-notify@.service $SYSTEMD_SERVICE_DIR
-        info "Make sure install and configure your ${BOLD}mstmp${RESET} at first."
-		shift 1
-		;;
-	-ef | --env-file)
-		ENV_FILE="$2"
-		shift 2
-		;;
 	--verbose)
 		VERBOSE=true
-		shift 1
-		;;
-	--x11 | -x)
-		X11=true
-		shift 1
-		;;
-	--uninstall-systemd)
-		uninstall_systemd
 		shift 1
 		;;
 	--no-autossh)
@@ -260,33 +278,26 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
-if $INSTALL_SYSTEMD = true; then
-
-	# Replace the User line
-	# sed -i "/^\[Service\]/,/\[/s/^User=.*/User=$SUDO_USER/" $SCRIPT_DIR/nat-traversal@.service
-	# Replace the ExecStart line
-	sed -i "/^\[Service\]/,/\[/s|ExecStart=.*|ExecStart=$SCRIPT_DIR/setup.sh --env-file $SCRIPT_DIR/.env.%i|" $SCRIPT_DIR/nat-traversal@.service
-
-	uninstall_systemd
-	install_systemd
-    exit 0
-fi
-
-if [ ! -f "$ENV_FILE" ]; then
-	error "$ENV_FILE not found."
+# Check if ENV_FILE is set
+if [ -z "${ENV_FILE+x}" ]; then
+	info "Configuration file is not given. Exiting."
 	exit 1
 fi
 
+if [ ! -f "$ENV_FILE" ]; then
+	error "${ENV_FILE} not found. Exiting."
+	exit 1
+fi
+
+info "Loading environment variables from the configuration file ${ENV_FILE}."
 set -o allexport && source ${ENV_FILE} && set +o allexport
 
-display_usage_messages
-
-warning "Make sure the port ${BOLD}${YELLOW}$redirector_tunnel_ssh_port${RESET} is available on ${BOLD}${YELLOW}$redirector_hostname${RESET}"
-warning "To check port availability: 
+warning "The port ${BOLD}${YELLOW}$redirector_tunnel_ssh_port${RESET} should be available on ${BOLD}${YELLOW}$redirector_hostname${RESET}."
+warning "To check port availability (for Ubuntu server $redirector_user@$redirector_hostname): 
 1. port is not in use, e.g.
-$redirector_user@$redirector_hostname $BOLD$GREEN\$$RESET sudo lsof -i :$redirector_tunnel_ssh_port
+$BOLD$GREEN\$$RESET sudo lsof -i :$redirector_tunnel_ssh_port
 2. firewall rules, e.g.
-$redirector_user@$redirector_hostname $BOLD$GREEN\$$RESET sudo ufw status | grep '$redirector_tunnel_ssh_port'"
+$BOLD$GREEN\$$RESET sudo ufw status | grep '$redirector_tunnel_ssh_port'"
 
 debug 'Execute "ssh-keygen -R $redirector_hostname"'
 set +e
@@ -299,8 +310,9 @@ if ! ssh -o ConnectTimeout=5 -p $redirector_ssh_port $redirector_user@$redirecto
 	error "Failed to establish SSH connection to redirector"
 	exit 1
 fi
+completed "Tested SSH connection to $redirector_user@$redirector_hostname"
 
-debug "Try to construct SSH reverse tunnel."
+info "Constructing SSH reverse tunnel."
 if $AUTOSSH = true; then
 	# Create log directory
 	LOG_DIR="$SCRIPT_DIR/logs"
@@ -315,6 +327,12 @@ if $AUTOSSH = true; then
 			-o "ExitOnForwardFailure=yes" \
 			-o "ServerAliveInterval=60" \
 			-o "ServerAliveCountMax=3"
+	elif $X11_TRUSTED = true; then
+		autossh -M $remote_autossh_monitor_port -YNCR "$redirector_tunnel_ssh_port:localhost:$remote_ssh_port" "$redirector_user@$redirector_hostname" -p $redirector_ssh_port \
+			-v -E "$LOG_FILE" \
+			-o "ExitOnForwardFailure=yes" \
+			-o "ServerAliveInterval=60" \
+			-o "ServerAliveCountMax=3"
 	else
 		autossh -M $remote_autossh_monitor_port -NR "$redirector_tunnel_ssh_port:localhost:$remote_ssh_port" "$redirector_user@$redirector_hostname" -p $redirector_ssh_port \
 			-v -E "$LOG_FILE" \
@@ -325,9 +343,11 @@ if $AUTOSSH = true; then
 else
 	if $X11 = true; then
 		ssh -XNCR "$redirector_tunnel_ssh_port:localhost:$remote_ssh_port" "$redirector_user@$redirector_hostname" -p $redirector_ssh_port
+	elif $X11_TRUSTED = true; then
+		ssh -YNCR "$redirector_tunnel_ssh_port:localhost:$remote_ssh_port" "$redirector_user@$redirector_hostname" -p $redirector_ssh_port
 	else
 		ssh -NR "$redirector_tunnel_ssh_port:localhost:$remote_ssh_port" "$redirector_user@$redirector_hostname" -p $redirector_ssh_port
 	fi
 fi
-
-completed "Done."
+completed "Constructed SSH reverse tunnel."
+completed "Done!"
