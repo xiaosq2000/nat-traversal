@@ -21,8 +21,8 @@ ${INDENT}|                 |<-->|              |<------------->|                
 ${INDENT}|    (Internet)   |    |  (Internet)  |  Reverse SSH  |    (Intranet)    | 
 ${INDENT}+-----------------+    +--------------+               +------------------+ 
 " \
-    "${INDENT}${BOLD}Note${RESET}: this script should be executed on the remote machine." \
-    "
+		"${INDENT}${BOLD}Note${RESET}: this script should be executed on the remote machine." \
+		"
 ${INDENT}+-------------------------------------------------------------+
 ${INDENT}|  Take Care!                                                 |
 ${INDENT}|  For security, the redirector should only be accessible:    |
@@ -47,6 +47,7 @@ display_help_messages() {
 		"" \
 		"${INDENT}[--list-env-files]          List the first line of .env.* files" \
 		"${INDENT}[--reindex-env-files]       Rename the .env.* files" \
+		"${INDENT}[--list-systemd-services]   List systemd services" \
 		"" \
 		"${INDENT}[-x, --x11]                 Enable X11 forwarding" \
 		"${INDENT}[-y, --x11-trusted]         Enable trusted X11 forwarding" \
@@ -138,6 +139,10 @@ install_dependencies() {
 	exit 0
 }
 
+list_systemd_services() {
+	SYSTEMD_COLORS=0 systemctl --user list-units -t service --full --all --no-legend --plain | grep 'nat-traversal@' | awk '{print $1}'
+}
+
 uninstall_systemd() {
 	info "Uninstalling related systemd services."
 	local to_uninstall=true
@@ -167,7 +172,7 @@ uninstall_systemd() {
 		if [[ ! -z "$(ls $SYSTEMD_SERVICE_DIR | grep 'nat-traversal@.service')" ]]; then
 			info "Found ${BOLD}nat-traversal@.service${RESET} in $BOLD${SYSTEMD_SERVICE_DIR}$RESET."
 			info "Stopping and disabling all instances."
-			SYSTEMD_COLORS=0 systemctl --user list-units -t service --full --all --no-legend --plain | grep 'nat-traversal@' | awk '{print $1}' | xargs -i systemctl --user disable \{\} --now
+			list_systemd_services | xargs -i systemctl --user disable \{\} --now
 			info "Removing the service template file."
 			rm "${SYSTEMD_SERVICE_DIR}/nat-traversal@.service"
 		fi
@@ -253,6 +258,11 @@ while [[ $# -gt 0 ]]; do
 		;;
 	--list-env-files)
 		list_env_files
+		shift 1
+		exit 0
+		;;
+	--list-systemd-services)
+		list_systemd_services
 		shift 1
 		exit 0
 		;;
