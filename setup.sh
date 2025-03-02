@@ -315,7 +315,7 @@ set -e
 
 # Verify SSH connection first
 info "Testing SSH connection to $redirector_user@$redirector_hostname..."
-if ! ssh -o ConnectTimeout=5 -p $redirector_ssh_port $redirector_user@$redirector_hostname "echo SSH connection test successful"; then
+if ! ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -p $redirector_ssh_port $redirector_user@$redirector_hostname "echo SSH connection test successful"; then
 	error "Failed to establish SSH connection to redirector"
 	exit 1
 fi
@@ -331,19 +331,19 @@ if $AUTOSSH = true; then
 	LOG_FILE="$LOG_DIR/nat-traversal-$ENV_SUFFIX-$(date +%Y%m%d).log"
 	info "Starting autossh tunnel, logging to $LOG_FILE"
 	if $X11 = true; then
-		autossh -M $remote_autossh_monitor_port -XNCR "$redirector_tunnel_ssh_port:localhost:$remote_ssh_port" "$redirector_user@$redirector_hostname" -p $redirector_ssh_port \
+		autossh -M $remote_autossh_monitor_port -X -N -C -R "$redirector_tunnel_ssh_port:localhost:$remote_ssh_port" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$redirector_user@$redirector_hostname" -p $redirector_ssh_port \
 			-v -E "$LOG_FILE" \
 			-o "ExitOnForwardFailure=yes" \
 			-o "ServerAliveInterval=60" \
 			-o "ServerAliveCountMax=3"
 	elif $X11_TRUSTED = true; then
-		autossh -M $remote_autossh_monitor_port -YNCR "$redirector_tunnel_ssh_port:localhost:$remote_ssh_port" "$redirector_user@$redirector_hostname" -p $redirector_ssh_port \
+		autossh -M $remote_autossh_monitor_port -Y -N -C -R "$redirector_tunnel_ssh_port:localhost:$remote_ssh_port" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$redirector_user@$redirector_hostname" -p $redirector_ssh_port \
 			-v -E "$LOG_FILE" \
 			-o "ExitOnForwardFailure=yes" \
 			-o "ServerAliveInterval=60" \
 			-o "ServerAliveCountMax=3"
 	else
-		autossh -M $remote_autossh_monitor_port -NR "$redirector_tunnel_ssh_port:localhost:$remote_ssh_port" "$redirector_user@$redirector_hostname" -p $redirector_ssh_port \
+		autossh -M $remote_autossh_monitor_port -N -R "$redirector_tunnel_ssh_port:localhost:$remote_ssh_port" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$redirector_user@$redirector_hostname" -p $redirector_ssh_port \
 			-v -E "$LOG_FILE" \
 			-o "ExitOnForwardFailure=yes" \
 			-o "ServerAliveInterval=60" \
@@ -351,11 +351,12 @@ if $AUTOSSH = true; then
 	fi
 else
 	if $X11 = true; then
-		ssh -XNCR "$redirector_tunnel_ssh_port:localhost:$remote_ssh_port" "$redirector_user@$redirector_hostname" -p $redirector_ssh_port
+		ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -X -N -C -R "$redirector_tunnel_ssh_port:localhost:$remote_ssh_port" "$redirector_user@$redirector_hostname" -p $redirector_ssh_port
 	elif $X11_TRUSTED = true; then
-		ssh -YNCR "$redirector_tunnel_ssh_port:localhost:$remote_ssh_port" "$redirector_user@$redirector_hostname" -p $redirector_ssh_port
+        echo "Hi"
+		ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -Y -N -C -R "$redirector_tunnel_ssh_port:localhost:$remote_ssh_port" "$redirector_user@$redirector_hostname" -p $redirector_ssh_port
 	else
-		ssh -NR "$redirector_tunnel_ssh_port:localhost:$remote_ssh_port" "$redirector_user@$redirector_hostname" -p $redirector_ssh_port
+		ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -N -R "$redirector_tunnel_ssh_port:localhost:$remote_ssh_port" "$redirector_user@$redirector_hostname" -p $redirector_ssh_port
 	fi
 fi
 completed "Constructed SSH reverse tunnel."
