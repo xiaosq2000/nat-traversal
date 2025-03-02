@@ -9,7 +9,10 @@ This tool creates a secure SSH tunnel through NAT, allowing you to access your r
 > 
 > **DISCLAIMER**: The author of this tool are not responsible for any security vulnerabilities, data breaches, or other issues that may arise from improper deployment or usage of this software. Users implement this solution at their own risk and are solely responsible for ensuring proper security measures are in place. By using this software, you acknowledge that you understand the security implications and will take appropriate precautions to protect your systems and data.
 
-![Safe NAT Traversal Diagram](./doc/illustration.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/xiaosq2000/nat-traversal/main/doc/illustration-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/xiaosq2000/nat-traversal/main/doc/illustration.png">
+</picture>
 
 ## Tutorial
 

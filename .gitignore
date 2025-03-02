@@ -1,6 +1,5 @@
 .env.*
 doc/*
 !doc/*.tex
-!doc/*.pdf
-!doc/*.svg
+!doc/*.png
 logs
