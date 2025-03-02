@@ -1,102 +1,170 @@
 # NAT Traversal
 
-Access your PC from anywhere, anytime using a redirector for SSH reverse tunneling.
+This tool creates a secure SSH tunnel through NAT, allowing you to access your remote machine (located behind a firewall or NAT) from anywhere. It uses a redirector (middle server) and establishes a reverse SSH tunnel to maintain connectivity.
 
-> [!NOTE]
-> For security reasons, it's highly recommended that the redirector only be accessible within an intranet or VPN.
+> [!WARNING]
+> For security, the redirector should only be accessible:
+> 1. In the intranet of your organization, or
+> 2. With a VPN service endorsed by your organization
+> 
+> **DISCLAIMER**: The author of this tool are not responsible for any security vulnerabilities, data breaches, or other issues that may arise from improper deployment or usage of this software. Users implement this solution at their own risk and are solely responsible for ensuring proper security measures are in place. By using this software, you acknowledge that you understand the security implications and will take appropriate precautions to protect your systems and data.
 
 ![Safe NAT Traversal Diagram](./doc/illustration.svg)
 
-## Quick start
+## Tutorial
 
-### 0. Get the redirector ready
+### Quick Start
 
-For the University of Macau, either one is fine.
+> [!NOTE]
+> The tutorial is for my fellow UM students and it's a memo for myself. :)
 
-- [UM's HPCC](https://icto.um.edu.mo/teaching-learning-research/high-performance-computing-cluster-hpcc/).
-- [SKL-IOTSC's SICC](https://skliotsc.um.edu.mo/research/super-intelligent-computing-center/)
+> [!NOTE]
+> The `setup.sh` script should be executed on the remote machine.
 
-### 1. Configuration 
+#### 0. Get Ready
 
-Here is an example for using SICC's login node as a redirector. Save the file as './.env.1'.
+1. Make sure you are accessible to a redirector server. 
+
+> [!TIP]
+> For SKL-IOTSC students, either one is fine:
+> - [UM's HPCC](https://icto.um.edu.mo/teaching-learning-research/high-performance-computing-cluster-hpcc/)
+> - [SKL-IOTSC's SICC](https://skliotsc.um.edu.mo/research/super-intelligent-computing-center/)
+
+1. Understand the setup:
+    - **Remote Machine**: The computer you want to access remotely (e.g., your lab PC or office workstation). This machine is typically behind a firewall or NAT and runs the setup script to establish the tunnel.
+    - **Redirector**: An accessible server with a public IP or within your organization's network (e.g., a university computing cluster) that acts as a bridge.
+    - **Local Machine**: The computer you are currently using (e.g., your laptop or personal device) from which you want to connect to your remote machine.
+
+#### 1. Configure
+
+Create a configuration file (e.g., `.env.1`) with the following parameters:
 
 ```sh
-redirector_user=学号
+# Example './.env.1': UM's HPCC
+X11_TRUSTED=true
+redirector_user=<your-student-id>
 redirector_hostname=login0.coral.um.edu.mo
-redirector_tunnel_ssh_port=36324
+redirector_tunnel_ssh_port=<redirector_tunnel_ssh_port>
 redirector_ssh_port=22
-remote_autossh_monitor_port=45861
+remote_autossh_monitor_port=<remote_autossh_monitor_port>
 remote_ssh_port=22
+remote_user=<username>
 ```
 
-### 2. Install
+Configuration parameters explained:
+- `X11_TRUSTED`: Enable trusted X11 forwarding (optional)
+- `redirector_user`: Your username on the redirector server
+- `redirector_hostname`: The hostname or IP of the redirector
+- `redirector_tunnel_ssh_port`: The port on the redirector to forward connections through **(must be available)**
+- `redirector_ssh_port`: The SSH port on the redirector (usually 22)
+- `remote_autossh_monitor_port`: A port for autossh to monitor the connection **(must be available)**
+- `remote_ssh_port`: The SSH port on your remote machine (usually 22)
+- `remote_user`: The username on your remote machine (`echo $USER`)
+
+<!--> [!NOTE]-->
+<!--> For VNC connections, add `VNC=true` to your configuration and set `remote_ssh_port` to the appropriate VNC port (5900 + display number).-->
+<!---->
+#### 2. Install Dependencies
 
 ```sh
-./setup.sh [--install-dependencies] [--install-systemd]
+sudo ./setup.sh --install-dependencies
 ```
 
-### 3. Run
+This installs:
+- autossh
+- openssh-server
+
+#### 3. Run
+
+Construct the tunnel for debugging.
 
 ```sh
-./setup.sh --env-file ./.env.1
+./setup.sh --env-file ./.env.1 -y --no-autossh
 ```
 
-### 4. Use
+> [!TIP]
+> - `--x11-trusted` or `-y`: Enable trusted X11 forwarding
+> - `--no-autossh`: Use SSH instead of autossh (for debugging)
 
-For guidance, check it out.
+#### 4. Test
+
+In a new shell, run the following command to get connection instructions for your specific configuration:
 
 ```sh
 ./setup.sh --env-file ./.env.1 --usage
 ```
 
-## Run as systemd service
+Execute the command on the local machine.
 
-Note: your configuration path must be './.env.${number}' to use the provided systemd service template.
+### Advanced Setup
+
+#### Run as Systemd Service
+
+For automatic startup and management:
 
 ```sh
-sudo ./setup.sh --install-systemd
-# For example, use '.env.2' file as your configuration.
+# Install the systemd service template
+./setup.sh --install-systemd
+
+# Enable and start the service using configuration from .env.2
 systemctl --user enable nat-traversal@2 --now
-# You may have a check on it.
-systemctl --user status nat-traversal@2 
+
+# Check service status
+systemctl --user status nat-traversal@2
 ```
 
-## VNC
+#### Configure Email Notifications
 
-Install VNC server on your remote machine and VNC client on your local machine. 
-
-[TurboVNC](https://github.com/TurboVNC/turbovnc/releases).
-
-Start VNC server on your remote PC. For example,
+You can configure email notifications for service failures:
 
 ```sh
-REMOTE_USER@REMOTE_MACHINE:~$ /opt/TurboVNC/bin/vncserver
+./setup.sh --install-systemd-email-notification
 ```
 
-It may give,
+> [!Note] 
+> You must have `msmtp` configured for email notifications to work.
 
+#### Configuration Management
+
+List all available configurations:
 ```sh
-Desktop 'TurboVNC: REMOTE_MACHINE:2 (REMOTE_USER)' started on display REMOTE_MACHINE:2
-
-Starting applications specified in /opt/TurboVNC/bin/xstartup.turbovnc
-Log file is ~/.vnc/REMOTE_MACHINE:2.log
+./setup.sh --list-env-files
 ```
 
-Note that the display number is "2". Then modify the configuration file, for example, './.env.3'.
-
+Renumber configuration files sequentially:
 ```sh
-VNC=true
-redirector_user=学号
-redirector_hostname=dgx.sicc.um.edu.mo
-redirector_tunnel_ssh_port=37081
-redirector_ssh_port=22
-remote_autossh_monitor_port=45851
-# ${remote_ssh_port} = 5900 + ${display_number}
-remote_ssh_port=5902
+./setup.sh --reindex-env-files
 ```
 
-For guidance, check it out.
-
+List systemd services:
 ```sh
-./setup.sh --env-file ./.env.3 --usage
+./setup.sh --list-systemd-services
 ```
+
+<!--## VNC Setup-->
+<!---->
+<!--1. Install VNC server (e.g., [TurboVNC](https://github.com/TurboVNC/turbovnc/releases)) on your remote machine-->
+<!--2. Start the VNC server:-->
+<!--   ```sh-->
+<!--   REMOTE_USER@REMOTE_MACHINE:~$ /opt/TurboVNC/bin/vncserver-->
+<!--   ```-->
+<!--3. Note the display number (e.g., `:2` means display number is `2`)-->
+<!--4. Create a VNC configuration file (e.g., `.env.3`):-->
+<!--   ```sh-->
+<!--   VNC=true-->
+<!--   redirector_user=<your-student-id>-->
+<!--   redirector_hostname=dgx.sicc.um.edu.mo-->
+<!--   redirector_tunnel_ssh_port=37081-->
+<!--   redirector_ssh_port=22-->
+<!--   remote_autossh_monitor_port=45851-->
+<!--   # ${remote_ssh_port} = 5900 + ${display_number}-->
+<!--   remote_ssh_port=5902-->
+<!--   ```-->
+<!--5. Start the tunnel:-->
+<!--   ```sh-->
+<!--   ./setup.sh --env-file ./.env.3-->
+<!--   ```-->
+<!--6. For connection instructions:-->
+<!--   ```sh-->
+<!--   ./setup.sh --env-file ./.env.3 --usage-->
+<!--   ```-->

@@ -78,15 +78,18 @@ display_usage_messages() {
 	set -o allexport && source ${ENV_FILE} && set +o allexport
 
 	if [[ $VNC != true ]]; then
-		printf "%s\n" "Usage: SSH twice
-
-Step 1: on the local machine (anyuser@anyhost)
-
-    ${GREEN}${BOLD}\$${RESET} ssh $redirector_user@$redirector_hostname -p $redirector_ssh_port [-YC]
-
-Step 2: on the redirector ($redirector_user@$redirector_hostname) 
-
-    ${GREEN}${BOLD}\$${RESET} ssh $USER@localhost -p $redirector_tunnel_ssh_port [-YC]
+# 		printf "%s\n" "Usage: SSH twice
+#
+# Step 1: on the local machine (anyuser@anyhost)
+#
+#     ${GREEN}${BOLD}\$${RESET} ssh $redirector_user@$redirector_hostname -p $redirector_ssh_port [-YC]
+#
+# Step 2: on the redirector ($redirector_user@$redirector_hostname) 
+#
+#     ${GREEN}${BOLD}\$${RESET} ssh $USER@localhost -p $redirector_tunnel_ssh_port [-YC]
+# "
+		printf "%s\n" "Usage:
+    ${GREEN}${BOLD}\$${RESET} ssh -J $redirector_user@$redirector_hostname:$redirector_ssh_port $remote_user@localhost -p $redirector_tunnel_ssh_port [-YC]
 "
 	else
 		printf "%s\n" "Usage: 
@@ -120,7 +123,7 @@ reindex_env_files() {
 		index=$((index + 1))
 	done
 
-	info "Environment files reindexed successfully"
+	completed "Environment files reindexed successfully"
 	list_env_files
 }
 
@@ -350,10 +353,10 @@ if $AUTOSSH = true; then
 			-o "ServerAliveCountMax=3"
 	fi
 else
+    completed "Done!"
 	if $X11 = true; then
 		ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -X -N -C -R "$redirector_tunnel_ssh_port:localhost:$remote_ssh_port" "$redirector_user@$redirector_hostname" -p $redirector_ssh_port
 	elif $X11_TRUSTED = true; then
-        echo "Hi"
 		ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -Y -N -C -R "$redirector_tunnel_ssh_port:localhost:$remote_ssh_port" "$redirector_user@$redirector_hostname" -p $redirector_ssh_port
 	else
 		ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -N -R "$redirector_tunnel_ssh_port:localhost:$remote_ssh_port" "$redirector_user@$redirector_hostname" -p $redirector_ssh_port
