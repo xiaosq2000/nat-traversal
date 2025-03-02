@@ -2,7 +2,8 @@
 
 Access your PC from anywhere, anytime using a redirector for SSH reverse tunneling.
 
-**Note: For security reasons, the redirector should only be accessible within an intranet or VPN!**
+> [!NOTE]
+> For security reasons, it's highly recommended that the redirector only be accessible within an intranet or VPN.
 
 ![Safe NAT Traversal Diagram](./doc/illustration.svg)
 
@@ -20,7 +21,6 @@ For the University of Macau, either one is fine.
 Here is an example for using SICC's login node as a redirector. Save the file as './.env.1'.
 
 ```sh
-VNC=false
 redirector_user=学号
 redirector_hostname=login0.coral.um.edu.mo
 redirector_tunnel_ssh_port=36324
@@ -32,7 +32,7 @@ remote_ssh_port=22
 ### 2. Install
 
 ```sh
-sudo ./setup.sh [--install-dependencies] [--install-systemd]
+./setup.sh [--install-dependencies] [--install-systemd]
 ```
 
 ### 3. Run
@@ -56,9 +56,9 @@ Note: your configuration path must be './.env.${number}' to use the provided sys
 ```sh
 sudo ./setup.sh --install-systemd
 # For example, use '.env.2' file as your configuration.
-sudo systemctl enable nat-traversal@2 --now
+systemctl --user enable nat-traversal@2 --now
 # You may have a check on it.
-sudo systemctl status nat-traversal@2 
+systemctl --user status nat-traversal@2 
 ```
 
 ## VNC
