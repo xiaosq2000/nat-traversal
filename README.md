@@ -10,9 +10,23 @@ This tool creates a secure SSH tunnel through NAT, allowing you to access your r
 > **DISCLAIMER**: The author of this tool are not responsible for any security vulnerabilities, data breaches, or other issues that may arise from improper deployment or usage of this software. Users implement this solution at their own risk and are solely responsible for ensuring proper security measures are in place. By using this software, you acknowledge that you understand the security implications and will take appropriate precautions to protect your systems and data.
 
 ![Logo](doc/illustration.png#gh-light-mode-only)
-![Logo](doc/illustration.png#gh-light-mode-only)
+![Logo](doc/illustration-dark.png#gh-dark-mode-only)
 
 ## Tutorial
+
+*Table of Contents*
+
+* [Quick Start](#quick-start)
+   * [0. Get Ready](#0-get-ready)
+   * [1. Configure](#1-configure)
+   * [2. Install Dependencies](#2-install-dependencies)
+   * [3. Run](#3-run)
+   * [4. Test](#4-test)
+* [Advanced Setup](#advanced-setup)
+   * [1. Run as Systemd Service](#1-run-as-systemd-service)
+   * [2. SSH Shortcut](#2-ssh-shortcut)
+   * [3. Configure Email Notifications](#3-configure-email-notifications)
+   * [Other Handy Commands](#other-handy-commands)
 
 ### Quick Start
 
@@ -38,7 +52,7 @@ This tool creates a secure SSH tunnel through NAT, allowing you to access your r
 
 #### 1. Configure
 
-Create a configuration file (e.g., `.env.1`) with the following parameters:
+Create a configuration file (e.g., `.env.1`, `.env.2`) with the following parameters:
 
 ```sh
 # Example './.env.1': UM's HPCC
@@ -51,6 +65,9 @@ remote_autossh_monitor_port=<remote_autossh_monitor_port>
 remote_ssh_port=22
 remote_user=<username>
 ```
+
+> [!NOTE]
+> The naming convention of configuration files, `.env.<digit>`, is for systemd convenience.
 
 Configuration parameters explained:
 - `X11_TRUSTED`: Enable trusted X11 forwarding (optional)
@@ -71,9 +88,7 @@ Configuration parameters explained:
 sudo ./setup.sh --install-dependencies
 ```
 
-This installs:
-- autossh
-- openssh-server
+This installs `autossh` and `openssh-server` for Ubuntu systems (using APT).
 
 #### 3. Run
 
@@ -99,9 +114,7 @@ Execute the command on the local machine.
 
 ### Advanced Setup
 
-#### Run as Systemd Service
-
-For automatic startup and management:
+#### 1. Run as Systemd Service
 
 ```sh
 # Install the systemd service template
@@ -114,18 +127,56 @@ systemctl --user enable nat-traversal@2 --now
 systemctl --user status nat-traversal@2
 ```
 
-#### Configure Email Notifications
+#### 2. SSH Shortcut
 
-You can configure email notifications for service failures:
+Configure your `~/.ssh/config`. Example:
+
+```
+Host <redirector_host>
+  User <redirector_user>
+  Port 22
+  Hostname <redirector-hostname>
+  IdentityFile ~/.ssh/id_rsa
+  RequestTTY force
+  ForwardX11 yes
+  ForwardX11Trusted yes
+  Compression yes
+  StrictHostKeyChecking no
+  UserKnownHostsFile /dev/null
+
+Host <remote_host>
+  HostName localhost
+  Port <remote_ssh_port>
+  User <remote_user>
+  ProxyJump <redirector_host>
+  ForwardX11 yes
+  ForwardX11Trusted yes
+  Compression yes
+  RequestTTY force
+```
+
+Then you can directly connect to your machine by:
 
 ```sh
-./setup.sh --install-systemd-email-notification
+ssh <remote_host>
 ```
+
+
+#### 3. Configure Email Notifications
 
 > [!Note] 
 > You must have `msmtp` configured for email notifications to work.
 
-#### Configuration Management
+```sh
+./setup.sh --install-systemd-email-notification
+# No need to enable the systemd service 
+```
+
+Example:
+![example-email-notification](./doc/example-email-notification.png)
+
+
+#### Other Handy Commands
 
 List all available configurations:
 ```sh
